@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Liver Transplant Postoperative Delirium Prediction Calculator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input[type="number"], select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 16px;
+            margin-top: 20px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f0f8ff;
+            border-radius: 4px;
+            border-left: 5px solid #2196F3;
+        }
+        .probability {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .interpretation {
+            background-color: #e8f5e8;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+        .model-info {
+            background-color: #fff3cd;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 30px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Liver Transplant Postoperative Delirium Prediction Calculator</h1>
+        
+        <div class="model-info">
+            <h3>Model Information</h3>
+            <p><strong>Model Type:</strong> Logistic regression model with interaction terms</p>
+            <p><strong>Variables:</strong> SII, NH3, Diabetes, Alcoholic cirrhosis, Infection, Length of ICU stay, SII*Infection interaction, NH3*Infection interaction</p>
+            <p><strong>C-index:</strong> 0.938 (based on interaction term model)</p>
+        </div>
+        
+        <form id="deliriumForm">
+            <div class="form-group">
+                <label for="sii">SII Value</label>
+                <input type="number" id="sii" name="sii" placeholder="Please enter SII value" required min="0" step="1">
+            </div>
+            
+            <div class="form-group">
+                <label for="nh3">NH3 Value</label>
+                <select id="nh3" name="nh3" required>
+                    <option value="">Please select</option>
+                    <option value="0">&lt; 72</option>
+                    <option value="1">≥ 72</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="diabetes">Diabetes</label>
+                <select id="diabetes" name="diabetes" required>
+                    <option value="">Please select</option>
+                    <option value="0">No</option>
+                    <option value="1">Yes</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="alcoholic">Alcoholic Cirrhosis</label>
+                <select id="alcoholic" name="alcoholic" required>
+                    <option value="">Please select</option>
+                    <option value="0">No</option>
+                    <option value="1">Yes</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="infection">Infection</label>
+                <select id="infection" name="infection" required>
+                    <option value="">Please select</option>
+                    <option value="0">No</option>
+                    <option value="1">Yes</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="icuStay">Length of ICU Stay (days)</label>
+                <input type="number" id="icuStay" name="icuStay" placeholder="Please enter length of ICU stay" required min="0" step="0.1">
+            </div>
+            
+            <button type="submit">Calculate Delirium Risk</button>
+        </form>
+        
+        <div class="result" id="result" style="display: none;">
+            <h3>Prediction Result</h3>
+            <div class="probability" id="probability"></div>
+            <div class="interpretation" id="interpretation"></div>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <p>This calculator is developed based on a logistic regression model with interaction terms. It is for clinical reference only and cannot replace the judgment of professional doctors.</p>
+    </div>
+    
+    <script>
+        // Model coefficients
+        const coefficients = {
+            intercept: -5.451357292,
+            sii: 0.004289506,
+            nh3: 0.151066975,
+            diabetes: 1.532200342,
+            alcoholic: 0.963725251,
+            infection: 0.485745089,
+            icuStay: 0.078980073,
+            siiInfection: 0.005641141,
+            nh3Infection: 0.708130164
+        };
+        
+        // Calculate prediction probability
+        function calculateProbability(formData) {
+            const sii = parseFloat(formData.get('sii'));
+            const nh3 = parseFloat(formData.get('nh3'));
+            const diabetes = parseFloat(formData.get('diabetes'));
+            const alcoholic = parseFloat(formData.get('alcoholic'));
+            const infection = parseFloat(formData.get('infection'));
+            const icuStay = parseFloat(formData.get('icuStay'));
+            
+            // Calculate logit value
+            const logit = coefficients.intercept +
+                         coefficients.sii * sii +
+                         coefficients.nh3 * nh3 +
+                         coefficients.diabetes * diabetes +
+                         coefficients.alcoholic * alcoholic +
+                         coefficients.infection * infection +
+                         coefficients.icuStay * icuStay +
+                         coefficients.siiInfection * sii * infection +
+                         coefficients.nh3Infection * nh3 * infection;
+            
+            // Convert to probability
+            const probability = Math.exp(logit) / (1 + Math.exp(logit));
+            return probability;
+        }
+        
+        // Get probability interpretation
+        function getInterpretation(probability) {
+            const percent = (probability * 100).toFixed(1);
+            
+            if (probability < 0.1) {
+                return `Predicted delirium risk is <strong>${percent}%</strong>, which is in the low risk range.`;
+            } else if (probability < 0.5) {
+                return `Predicted delirium risk is <strong>${percent}%</strong>, which is in the moderate risk range.`;
+            } else {
+                return `Predicted delirium risk is <strong>${percent}%</strong>, which is in the high risk range. Close monitoring is recommended.`;
+            }
+        }
+        
+        // Form submission handling
+        document.getElementById('deliriumForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const probability = calculateProbability(formData);
+            const percent = (probability * 100).toFixed(1);
+            
+            // Display result
+            document.getElementById('probability').innerHTML = `Predicted Delirium Risk: <strong>${percent}%</strong>`;
+            document.getElementById('interpretation').innerHTML = getInterpretation(probability);
+            document.getElementById('result').style.display = 'block';
+        });
+    </script>
+</body>
+</html>
